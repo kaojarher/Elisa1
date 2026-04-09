@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ELISA1機器人</title>
+    <style>
+        :root {
+            --primary-color: #4a90e2;
+            --bg-gradient: linear-gradient(135deg, #e0eafc 0%, #cfdef3 100%);
+        }
+
+        body {
+            font-family: "Segoe UI", "Microsoft JhengHei", sans-serif;
+            background: var(--bg-gradient);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+        }
+
+        #chat-container {
+            width: 90%;
+            max-width: 480px;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.15);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* API Key 設定區 */
+        #api-settings {
+            background: #f8f9fa;
+            padding: 12px;
+            border-bottom: 1px solid #eee;
+            font-size: 13px;
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+        #api-settings input {
+            padding: 6px 10px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            outline: none;
+        }
+
+        /* 臉部表情區 */
+        #bot-face {
+            height: 100px;
+            background: #fff;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            cursor: pointer;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        .eye {
+            width: 16px;
+            height: 16px;
+            background: #333;
+            border-radius: 50%;
+            margin: 0 25px;
+            transition: transform 0.15s ease-in-out;
+        }
+        .cheek {
+            width: 30px;
+            height: 16px;
+            background: #ffc0cb;
+            border-radius: 50%;
+            position: absolute;
+            top: 55px;
+            opacity: 0.5;
+            transition: all 0.3s ease;
+        }
+        .cheek.left { left: 165px; }
+        .cheek.right { right: 165px; }
+
+        /* 訊息區 */
+        #chat-window {
+            height: 380px;
+            overflow-y: auto;
+            padding: 20px;
+            background: #fafafa;
+        }
+        .msg {
+            margin-bottom: 15px;
+            padding: 12px 16px;
+            border-radius: 15px;
+            max-width: 85%;
+            line-height: 1.6;
+            font-size: 15px;
+            word-wrap: break-word;
+        }
+        .user {
+            background: var(--primary-color);
+            color: white;
+            margin-left: auto;
+            border-bottom-right-radius: 2px;
+        }
+        .bot {
+            background: #e9ecef;
+            color: #333;
+            border-bottom-left-radius: 2px;
+        }
+
+        /* 輸入區 */
+        #input-area {
+            display: flex;
+            padding: 15px;
+            background: white;
+            border-top: 1px solid #eee;
+        }
+        input#user-input {
+            flex: 1;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 25px;
+            outline: none;
+            font-size: 15px;
+        }
+        button#send-btn {
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 0 20px;
+            margin-left: 10px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        button#send-btn:disabled { background: #ccc; }
+
+        /* 載入中動畫 */
+        #typing {
+            font-size: 12px;
+            color: #999;
+            padding: 0 20px 10px;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+
+<div id="chat-container">
+    <div id="api-settings">
+        <label for="api-key">🔑 輸入您的 Gemini API Key:</label>
+        <input type="password" id="api-key" placeholder="" >
+        <small style="color: #666;">您的金鑰僅儲存在本地瀏覽器內</small>
+    </div>
+
+    <div id="bot-face" onclick="blinkEffect()">
+        <div class="eye left" id="eye-l"></div>
+        <div class="eye right" id="eye-r"></div>
+        <div class="cheek left" id="cheek-l"></div>
+        <div class="cheek right" id="cheek-r"></div>
+    </div>
+
+    <div id="chat-window"></div>
+    <div id="typing">ELISA 正在思考中...</div>
+
+    <div id="input-area">
+        <input type="text" id="user-input" placeholder="說說你的心情..." onkeypress="if(event.key==='Enter') sendMessage()" />
+        <button id="send-btn" onclick="sendMessage()">送出</button>
+    </div>
+</div>
+
+<script>
+    const chatWindow = document.getElementById('chat-window');
+    const userInput = document.getElementById('user-input');
+    const typingIndicator = document.getElementById('typing');
+    let chatHistory = [];
+
+    // 1. 語音功能 (TW)
+    function speak(text) {
+        if ('speechSynthesis' in window) {
+            window.speechSynthesis.cancel(); 
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.lang = "zh-TW";
+            utterance.rate = 1.0;
+            window.speechSynthesis.speak(utterance);
+        }
+    }
+
+    // 2. 表情特效
+    function blinkEffect() {
+        const eyes = document.querySelectorAll('.eye');
+        const cheeks = document.querySelectorAll('.cheek');
+        
+        eyes.forEach(e => e.style.transform = "scaleY(0.1)");
+        cheeks.forEach(c => {
+            c.style.background = "#ff6b6b";
+            c.style.opacity = "0.8";
+        });
+
+        setTimeout(() => {
+            eyes.forEach(e => e.style.transform = "scaleY(1)");
+            setTimeout(() => {
+                cheeks.forEach(c => {
+                    c.style.background = "#ffc0cb";
+                    c.style.opacity = "0.5";
+                });
+            }, 500);
+        }, 200);
+    }
+
+    // 3. 新增訊息到畫面
+    function appendMessage(text, sender) {
+        const div = document.createElement('div');
+        div.className = `msg ${sender}`;
+        div.textContent = text;
+        chatWindow.appendChild(div);
+        chatWindow.scrollTop = chatWindow.scrollHeight;
+        
+        if (sender === 'bot') {
+            speak(text);
+            blinkEffect();
+        }
+    }
+
+    // 4. 串接 Gemini API
+		async function getGeminiResponse(text) {
+			const apiKey = document.getElementById('api-key').value.trim();
+			if (!apiKey) return "請先輸入 API Key 喔！";
+
+			typingIndicator.style.display = "block";
+			
+			// 內建您的專業優化與事實查核提示語
+        const systemInstruction = ``;
+			
+			
+			
+			// 根據您查到的 2026 最新模型名稱
+			const modelName = "gemini-3-flash-preview"; 
+			
+			try {
+				// 使用 v1beta 介面與最新模型名稱
+				const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
+				
+				const response = await fetch(url, {
+					method: "POST",
+					headers: { "Content-Type": "application/json" },
+					body: JSON.stringify({
+						contents: [{
+							parts: [{ 
+								text: `${systemInstruction}\n\n你現在是 ELISA，溫暖的台灣心理輔導員。請用繁體中文回覆，語氣簡短且具同理心。使用者說：${text}` 
+							}]
+						}]
+					})
+				});
+
+				const data = await response.json();
+
+				// 檢查 API 回傳錯誤
+				if (data.error) {
+					console.error("API Error:", data.error);
+					return `連線訊息：${data.error.message}`;
+				}
+
+				// 解析回傳內容
+				if (data.candidates && data.candidates[0].content) {
+					return data.candidates[0].content.parts[0].text;
+				}
+				
+				return "我收到了訊息，但不知道該怎麼回應，能換個方式說說嗎？";
+
+			} catch (error) {
+				console.error("Fetch Error:", error);
+				return "連線發生問題，請檢查網路狀態。";
+			} finally {
+				typingIndicator.style.display = "none";
+			}
+		}
+    // 5. 發送按鈕邏輯
+    async function sendMessage() {
+        const text = userInput.value.trim();
+        if (!text) return;
+
+        appendMessage(text, 'user');
+        userInput.value = "";
+
+        const botReply = await getGeminiResponse(text);
+        appendMessage(botReply, 'bot');
+    }
+
+    // 初始化
+    window.onload = () => {
+        appendMessage("你好！我是 ELISA 😊。今天加入了 Gemini AI 的心靈導航功能。請輸入 API Key 並跟我說說你現在的感覺好嗎？", "bot");
+    };
+</script>
+
+</body>
+</html>
