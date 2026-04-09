@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ELISA 專業心理顧問</title>
+    <style>
+        :root {
+            --primary-color: #4a90e2;
+            --bg-gradient: linear-gradient(135deg, #e0eafc 0%, #cfdef3 100%);
+        }
+
+        body {
+            font-family: "Segoe UI", "Microsoft JhengHei", sans-serif;
+            background: var(--bg-gradient);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+        }
+
+        #chat-container {
+            width: 90%;
+            max-width: 480px;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.15);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* 臉部表情區 */
+        #bot-face {
+            height: 120px;
+            background: #fff;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            cursor: pointer;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        .eye {
+            width: 16px;
+            height: 16px;
+            background: #333;
+            border-radius: 50%;
+            margin: 0 25px;
+            transition: transform 0.15s ease-in-out;
+        }
+        .cheek {
+            width: 30px;
+            height: 16px;
+            background: #ffc0cb;
+            border-radius: 50%;
+            position: absolute;
+            top: 65px;
+            opacity: 0.5;
+            transition: all 0.3s ease;
+        }
+        .cheek.left { left: calc(50% - 60px); }
+        .cheek.right { right: calc(50% - 60px); }
+
+        /* 訊息區 */
+        #chat-window {
+            height: 420px;
+            overflow-y: auto;
+            padding: 20px;
+            background: #fafafa;
+        }
+        .msg {
+            margin-bottom: 15px;
+            padding: 12px 16px;
+            border-radius: 15px;
+            max-width: 85%;
+            line-height: 1.6;
+            font-size: 15px;
+            word-wrap: break-word;
+            white-space: pre-wrap; /* 讓 AI 的回覆保留換行格式 */
+        }
+        .user {
+            background: var(--primary-color);
+            color: white;
+            margin-left: auto;
+            border-bottom-right-radius: 2px;
+        }
+        .bot {
+            background: #e9ecef;
+            color: #333;
+            border-bottom-left-radius: 2px;
+        }
+
+        /* 輸入區 */
+        #input-area {
+            display: flex;
+            padding: 15px;
+            background: white;
+            border-top: 1px solid #eee;
+        }
+        input#user-input {
+            flex: 1;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 25px;
+            outline: none;
+            font-size: 15px;
+        }
+        button#send-btn {
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 0 20px;
+            margin-left: 10px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        #typing {
+            font-size: 12px;
+            color: #999;
+            padding: 5px 20px;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+
+<div id="chat-container">
+    <div id="bot-face" onclick="blinkEffect()">
+        <div class="eye left"></div>
+        <div class="eye right"></div>
+        <div class="cheek left"></div>
+        <div class="cheek right"></div>
+    </div>
+
+    <div id="chat-window"></div>
+    <div id="typing">輸入中...</div>
+
+    <div id="input-area">
+        <input type="text" id="user-input" placeholder="跟我聊聊任何事..." onkeypress="if(event.key==='Enter') sendMessage()" />
+        <button id="send-btn" onclick="sendMessage()">送出</button>
+    </div>
+</div>
+
+<script>
+    // ==========================================
+    // 1. 設定區：請在此填入您的 API Key
+    // ==========================================
+    const MY_GEMINI_KEY = "AIzaSyBVq93Lhi98EPg3Plfce0ciJho0q__P2c0"; 
+    const MODEL_NAME = "gemini-3-flash-preview";
+
+    const chatWindow = document.getElementById('chat-window');
+    const userInput = document.getElementById('user-input');
+    const typingIndicator = document.getElementById('typing');
+
+    // 2. 語音功能 (TW)
+    function speak(text) {
+        if ('speechSynthesis' in window) {
+            window.speechSynthesis.cancel(); 
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.lang = "zh-TW";
+            window.speechSynthesis.speak(utterance);
+        }
+    }
+
+    // 3. 表情特效
+    function blinkEffect() {
+        const eyes = document.querySelectorAll('.eye');
+        const cheeks = document.querySelectorAll('.cheek');
+        eyes.forEach(e => e.style.transform = "scaleY(0.1)");
+        cheeks.forEach(c => c.style.background = "#ff6b6b");
+        setTimeout(() => {
+            eyes.forEach(e => e.style.transform = "scaleY(1)");
+            setTimeout(() => {
+                cheeks.forEach(c => c.style.background = "#ffc0cb");
+            }, 400);
+        }, 200);
+    }
+
+    // 4. 新增訊息到畫面
+    function appendMessage(text, sender) {
+        const div = document.createElement('div');
+        div.className = `msg ${sender}`;
+        div.textContent = text;
+        chatWindow.appendChild(div);
+        chatWindow.scrollTop = chatWindow.scrollHeight;
+        if (sender === 'bot') {
+            speak(text);
+            blinkEffect();
+        }
+    }
+
+    // 5. 核心：優化後的 API 呼叫邏輯
+async function getGeminiResponse(text) {
+        typingIndicator.style.display = "block";
+        
+        const systemInstruction = `你是簡潔回答提示詞專家。我輸入的「原始提示詞」時，請先將其轉化為更精確、能讓模型發揮最高效能的指令。 優化核心原則： 最有效的提示詞平均約為21個字。若原始提示詞過於簡短，請務必在轉化過程中強化「背景資訊」維度，以確保回覆品質。轉化時必須包含以下四個維度： [角色任務]：定義專業身份與核心目標。 [背景資訊]：提供必要的情境。 [具體指令]：拆解明確的操作步驟。 [約束條件]：規定格式、語氣，且一律使用「正向表述」（明確說明要做什麼），並加註來源。依據你資料中，信心水準低於 90%直接輸出資料不足無法確認`;
+
+        try {
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL_NAME}:generateContent?key=${MY_GEMINI_KEY}`;
+            const response = await fetch(url, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    contents: [{ parts: [{ text: `${systemInstruction}\n\n使用者原始提示詞：${text}` }] }]
+                })
+            });
+
+            const data = await response.json();
+
+            // --- 新增：針對配額超出 (Error 429) 的溫暖處理 ---
+            if (data.error) {
+                if (data.error.message.includes("quota") || data.error.code === 429) {
+                    return "哎呀，我現在思緒稍微有點混亂（連線太頻繁了）... ☕️ 請給我約 30 秒的時間休息一下，再跟我說說話好嗎？";
+                }
+                return `連線錯誤：${data.error.message}`;
+            }
+
+            if (data.candidates && data.candidates[0].content) {
+                return data.candidates[0].content.parts[0].text;
+            }
+            return "【資料不足，無法確認】";
+
+        } catch (error) {
+            return "網路連線似乎有點不穩，請稍後再試。";
+        } finally {
+            typingIndicator.style.display = "none";
+        }
+    }
+
+    // 6. 發送邏輯
+    async function sendMessage() {
+        const text = userInput.value.trim();
+        if (!text) return;
+
+        appendMessage(text, 'user');
+        userInput.value = "";
+
+        const botReply = await getGeminiResponse(text);
+        appendMessage(botReply, 'bot');
+    }
+
+    // 初始化
+    window.onload = () => {
+        appendMessage("你好！我是 ELISA 😊。現在我已配備專業顧問與事實查核邏輯，想聊聊什麼呢？", "bot");
+    };
+</script>
+
+</body>
+</html>
