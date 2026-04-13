@@ -3,405 +3,295 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ELISA 專業心理顧問</title>
+    <title>ELISA1機器人</title>
     <style>
         :root {
-            --primary:   #4a90e2;
-            --bg:        linear-gradient(135deg, #e0eafc 0%, #cfdef3 100%);
-            --face-h:    120px;
-            --face-hmax: 340px;
-            --spd:       0.38s;
+            --primary-color: #4a90e2;
+            --bg-gradient: linear-gradient(135deg, #e0eafc 0%, #cfdef3 100%);
         }
-        * { box-sizing: border-box; }
+
         body {
             font-family: "Segoe UI", "Microsoft JhengHei", sans-serif;
-            background: var(--bg);
+            background: var(--bg-gradient);
             display: flex;
             justify-content: center;
             align-items: center;
             min-height: 100vh;
             margin: 0;
         }
+
         #chat-container {
-            width: 90%; max-width: 480px;
-            background: #fff;
+            width: 90%;
+            max-width: 480px;
+            background: white;
             border-radius: 20px;
             box-shadow: 0 15px 35px rgba(0,0,0,0.15);
-            display: flex; flex-direction: column;
+            display: flex;
+            flex-direction: column;
             overflow: hidden;
+            position: relative;
         }
 
-        /* ── 臉部區 ── */
+        /* API Key 設定區 */
+        #api-settings {
+            background: #f8f9fa;
+            padding: 12px;
+            border-bottom: 1px solid #eee;
+            font-size: 13px;
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+        #api-settings input {
+            padding: 6px 10px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            outline: none;
+        }
+
+        /* 臉部表情區 */
         #bot-face {
-            height: var(--face-h);
+            height: 100px;
             background: #fff;
-            display: flex; justify-content: center; align-items: center;
-            position: relative; cursor: pointer;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            cursor: pointer;
             border-bottom: 1px solid #f0f0f0;
-            transition: height var(--spd) cubic-bezier(0.34,1.45,0.64,1);
-            overflow: hidden; flex-shrink: 0;
         }
-        #bot-face.maximized { height: var(--face-hmax); background: #fff; }
-
         .eye {
-            width: 16px; height: 16px;
-            background: #333; border-radius: 50%;
+            width: 16px;
+            height: 16px;
+            background: #333;
+            border-radius: 50%;
             margin: 0 25px;
-            transition: width var(--spd), height var(--spd),
-                        margin var(--spd), transform 0.15s ease-in-out;
-            position: relative; z-index: 1;
+            transition: transform 0.15s ease-in-out;
         }
-        #bot-face.maximized .eye { width: 40px; height: 40px; margin: 0 44px; }
-
         .cheek {
-            width: 30px; height: 16px;
-            background: #ffc0cb; border-radius: 50%;
-            position: absolute; top: 65px; opacity: 0.5;
-            transition: all var(--spd) ease;
+            width: 30px;
+            height: 16px;
+            background: #ffc0cb;
+            border-radius: 50%;
+            position: absolute;
+            top: 55px;
+            opacity: 0.5;
+            transition: all 0.3s ease;
         }
-        .cheek.left  { left:  calc(50% - 60px); }
-        .cheek.right { right: calc(50% - 60px); }
-        #bot-face.maximized .cheek { width: 64px; height: 32px; top: 190px; opacity: 0.55; }
-        #bot-face.maximized .cheek.left  { left:  calc(50% - 115px); }
-        #bot-face.maximized .cheek.right { right: calc(50% - 115px); }
+        .cheek.left { left: 165px; }
+        .cheek.right { right: 165px; }
 
-        #bot-name {
-            position: absolute; bottom: 20px; left: 0; right: 0;
-            text-align: center; font-size: 13px; font-weight: 600;
-            letter-spacing: 3px; color: var(--primary);
-            opacity: 0; transform: translateY(8px);
-            transition: opacity var(--spd), transform var(--spd);
-            pointer-events: none;
-        }
-        #bot-face.maximized #bot-name { opacity: 1; transform: none; }
-
-        /* ── 三顆控制按鈕列 ── */
-        #ctrl-bar {
-            position: absolute; top: 8px; right: 10px;
-            display: flex; gap: 6px; z-index: 20;
-        }
-        .ctrl-btn {
-            display: flex; align-items: center; gap: 4px;
-            padding: 3px 10px; border-radius: 8px;
-            border: 1.5px solid rgba(74,144,226,0.35);
-            background: rgba(74,144,226,0.10);
-            color: var(--primary);
-            font-size: 12px; font-weight: 600;
-            cursor: pointer; white-space: nowrap; line-height: 1.7;
-            transition: background 0.2s, transform 0.15s, border-color 0.2s;
-            user-select: none;
-        }
-        .ctrl-btn:hover  { background: rgba(74,144,226,0.22); transform: scale(1.05); }
-        .ctrl-btn:active { transform: scale(0.95); }
-        .ctrl-btn.standby-on {
-            background: rgba(255,160,50,0.15);
-            border-color: rgba(255,160,50,0.5);
-            color: #d07010;
-        }
-        .ctrl-btn.listen-on {
-            background: rgba(60,180,100,0.15);
-            border-color: rgba(60,180,100,0.5);
-            color: #1a8040;
-            animation: pulse 1.2s ease-in-out infinite;
-        }
-        @keyframes pulse {
-            0%,100% { box-shadow: 0 0 0 0   rgba(60,180,100,0.4); }
-            50%      { box-shadow: 0 0 0 6px rgba(60,180,100,0);   }
-        }
-
-        /* ── 待命 / 聆聽 提示文字（臉部內） ── */
-        #standby-overlay {
-            position: absolute; bottom: 48px; left: 0; right: 0;
-            text-align: center; font-size: 12px; color: #bbb;
-            letter-spacing: 1px; opacity: 0; pointer-events: none;
-            transition: opacity 0.3s;
-        }
-        #bot-face.maximized #standby-overlay.show { opacity: 1; }
-
-        #listen-caption {
-            position: absolute; bottom: 52px; left: 12px; right: 12px;
-            background: rgba(60,180,100,0.10);
-            border: 1px solid rgba(60,180,100,0.3);
-            border-radius: 10px; padding: 6px 12px;
-            font-size: 13px; color: #1a7040; text-align: center;
-            opacity: 0; pointer-events: none; transition: opacity 0.3s;
-        }
-        #listen-caption.show { opacity: 1; }
-
-        /* ── 可折疊區（對話框 + 輸入） ── */
-        #collapsible {
-            overflow: hidden;
-            max-height: 600px;
-            opacity: 1;
-            transition: max-height var(--spd) ease, opacity var(--spd) ease;
-        }
-        #collapsible.hidden { max-height: 0; opacity: 0; }
-
+        /* 訊息區 */
         #chat-window {
-            height: 380px; overflow-y: auto;
-            padding: 20px; background: #fafafa;
+            height: 380px;
+            overflow-y: auto;
+            padding: 20px;
+            background: #fafafa;
         }
         .msg {
-            margin-bottom: 15px; padding: 12px 16px;
-            border-radius: 15px; max-width: 85%;
-            line-height: 1.6; font-size: 15px;
-            word-wrap: break-word; white-space: pre-wrap;
+            margin-bottom: 15px;
+            padding: 12px 16px;
+            border-radius: 15px;
+            max-width: 85%;
+            line-height: 1.6;
+            font-size: 15px;
+            word-wrap: break-word;
         }
-        .user { background: var(--primary); color: #fff; margin-left: auto; border-bottom-right-radius: 2px; }
-        .bot  { background: #e9ecef; color: #333; border-bottom-left-radius: 2px; }
-
-        .search-hint {
-            font-size: 12px; color: #888; margin-top: 4px;
-            display: flex; align-items: center; gap: 4px;
+        .user {
+            background: var(--primary-color);
+            color: white;
+            margin-left: auto;
+            border-bottom-right-radius: 2px;
         }
-        .search-hint::before { content: "🔍"; }
+        .bot {
+            background: #e9ecef;
+            color: #333;
+            border-bottom-left-radius: 2px;
+        }
 
-        #typing { font-size: 12px; color: #999; padding: 5px 20px; display: none; }
-
+        /* 輸入區 */
         #input-area {
-            display: flex; padding: 15px;
-            background: #fff; border-top: 1px solid #eee;
+            display: flex;
+            padding: 15px;
+            background: white;
+            border-top: 1px solid #eee;
         }
-        #user-input {
-            flex: 1; padding: 12px;
-            border: 1px solid #ddd; border-radius: 25px;
-            outline: none; font-size: 15px;
+        input#user-input {
+            flex: 1;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 25px;
+            outline: none;
+            font-size: 15px;
         }
-        #send-btn {
-            background: var(--primary); color: #fff; border: none;
-            padding: 0 20px; margin-left: 10px;
-            border-radius: 25px; cursor: pointer; font-weight: bold;
+        button#send-btn {
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 0 20px;
+            margin-left: 10px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        button#send-btn:disabled { background: #ccc; }
+
+        /* 載入中動畫 */
+        #typing {
+            font-size: 12px;
+            color: #999;
+            padding: 0 20px 10px;
+            display: none;
         }
     </style>
 </head>
 <body>
 
 <div id="chat-container">
-
-    <!-- 臉部區 -->
-    <div id="bot-face" onclick="handleFaceClick(event)">
-
-        <div id="ctrl-bar">
-            <button class="ctrl-btn" id="toggle-btn"  title="最大化／還原">⛶ 最大化</button>
-            <button class="ctrl-btn" id="standby-btn" title="待命模式">⏸ 待命</button>
-            <button class="ctrl-btn" id="listen-btn"  title="語音聆聽">🎙 聆聽</button>
-        </div>
-
-        <div class="eye left"></div>
-        <div class="eye right"></div>
-        <div class="cheek left"></div>
-        <div class="cheek right"></div>
-
-        <div id="bot-name">E · L · I · S · A</div>
-        <div id="standby-overlay">— 待命中，隨時叫我 —</div>
-        <div id="listen-caption">🎙 聆聽中，請說話…</div>
+    <div id="api-settings">
+        <label for="api-key">🔑 輸入您的 Gemini API Key:</label>
+        <input type="password" id="api-key" placeholder="" >
+        <small style="color: #666;">您的金鑰僅儲存在本地瀏覽器內</small>
     </div>
 
-    <!-- 可折疊：對話框 + 輸入 -->
-    <div id="collapsible">
-        <div id="chat-window"></div>
-        <div id="typing">輸入中...</div>
-        <div id="input-area">
-            <input type="text" id="user-input"
-                   placeholder="跟我聊聊任何事..."
-                   onkeypress="if(event.key==='Enter') sendMessage()" />
-            <button id="send-btn" onclick="sendMessage()">送出</button>
-        </div>
+    <div id="bot-face" onclick="blinkEffect()">
+        <div class="eye left" id="eye-l"></div>
+        <div class="eye right" id="eye-r"></div>
+        <div class="cheek left" id="cheek-l"></div>
+        <div class="cheek right" id="cheek-r"></div>
+    </div>
+
+    <div id="chat-window"></div>
+    <div id="typing">ELISA 正在思考中...</div>
+
+    <div id="input-area">
+        <input type="text" id="user-input" placeholder="說說你的心情..." onkeypress="if(event.key==='Enter') sendMessage()" />
+        <button id="send-btn" onclick="sendMessage()">送出</button>
     </div>
 </div>
 
 <script>
-const MY_GEMINI_KEY = "AIzaSyDOPEqORIvpeBL0E1sPhXYTpvvzzyhzSx4";
-const MODEL_NAME    = "gemini-3-flash-preview";
+    const chatWindow = document.getElementById('chat-window');
+    const userInput = document.getElementById('user-input');
+    const typingIndicator = document.getElementById('typing');
+    let chatHistory = [];
 
-const chatWindowEl   = document.getElementById('chat-window');
-const userInputEl    = document.getElementById('user-input');
-const typingEl       = document.getElementById('typing');
-const botFaceEl      = document.getElementById('bot-face');
-const collapsibleEl  = document.getElementById('collapsible');
-const standbyOverlay = document.getElementById('standby-overlay');
-const listenCaption  = document.getElementById('listen-caption');
-const toggleBtn      = document.getElementById('toggle-btn');
-const standbyBtn     = document.getElementById('standby-btn');
-const listenBtn      = document.getElementById('listen-btn');
-
-let faceMaximized = false;
-let standbyMode   = false;
-let listeningMode = false;
-let recognition   = null;
-
-/* ── 最大化 / 還原 ── */
-function toggleFace() {
-    faceMaximized = !faceMaximized;
-    botFaceEl.classList.toggle('maximized',       faceMaximized);
-    collapsibleEl.classList.toggle('hidden',       faceMaximized);
-    toggleBtn.textContent = faceMaximized ? '⊡ 還原' : '⛶ 最大化';
-    standbyOverlay.classList.toggle('show', faceMaximized && standbyMode);
-}
-
-/* ── 待命 ── */
-function toggleStandby() {
-    standbyMode = !standbyMode;
-    standbyBtn.classList.toggle('standby-on', standbyMode);
-    standbyBtn.textContent = standbyMode ? '▶ 解除待命' : '⏸ 待命';
-    if (standbyMode) {
-        window.speechSynthesis && window.speechSynthesis.cancel();
-        document.querySelectorAll('.eye').forEach(e => e.style.transform = 'scaleY(0.35)');
-        standbyOverlay.classList.toggle('show', faceMaximized);
-    } else {
-        document.querySelectorAll('.eye').forEach(e => e.style.transform = 'scaleY(1)');
-        standbyOverlay.classList.remove('show');
-    }
-}
-
-/* ── 聆聽 ── */
-function toggleListen() {
-    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SR) { alert('您的瀏覽器不支援語音辨識，請使用 Chrome 試試看 😊'); return; }
-    listeningMode ? stopListening() : startListening(SR);
-}
-
-function startListening(SR) {
-    recognition = new SR();
-    recognition.lang = 'zh-TW';
-    recognition.interimResults = true;
-    recognition.continuous     = false;
-
-    recognition.onstart = () => {
-        listeningMode = true;
-        listenBtn.classList.add('listen-on');
-        listenBtn.textContent = '⏹ 停止';
-        listenCaption.textContent = '🎙 聆聽中，請說話…';
-        listenCaption.classList.add('show');
-    };
-    recognition.onresult = (ev) => {
-        const t = Array.from(ev.results).map(r => r[0].transcript).join('');
-        listenCaption.textContent = `🎙 ${t}`;
-        if (ev.results[ev.results.length - 1].isFinal) {
-            userInputEl.value = t;
-            if (!faceMaximized && !standbyMode) setTimeout(() => sendMessage(), 300);
+    // 1. 語音功能 (TW)
+    function speak(text) {
+        if ('speechSynthesis' in window) {
+            window.speechSynthesis.cancel(); 
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.lang = "zh-TW";
+            utterance.rate = 1.0;
+            window.speechSynthesis.speak(utterance);
         }
-    };
-    recognition.onerror = () => stopListening();
-    recognition.onend   = () => stopListening();
-    recognition.start();
-}
-
-function stopListening() {
-    listeningMode = false;
-    listenBtn.classList.remove('listen-on');
-    listenBtn.textContent = '🎙 聆聽';
-    listenCaption.classList.remove('show');
-    try { recognition && recognition.stop(); } catch(e) {}
-    recognition = null;
-}
-
-/* ── 按鈕事件 ── */
-toggleBtn.addEventListener ('click', e => { e.stopPropagation(); toggleFace();    });
-standbyBtn.addEventListener('click', e => { e.stopPropagation(); toggleStandby(); });
-listenBtn.addEventListener ('click', e => { e.stopPropagation(); toggleListen();  });
-
-function handleFaceClick(e) {
-    if (e.target.closest('#ctrl-bar')) return;
-    blinkEffect();
-}
-
-/* ── Google 搜尋 ── */
-const SEARCH_TRIGGERS = ['幫我找','請搜尋','幫我搜尋','請幫我找'];
-const detectSearch = t => SEARCH_TRIGGERS.some(k => t.includes(k));
-function extractQuery(text) {
-    let q = text;
-    SEARCH_TRIGGERS.forEach(k => { q = q.replace(k, ''); });
-    return q.replace(/[，,。！？\s]+/g,' ').trim();
-}
-
-/* ── 語音合成 ── */
-function speak(text) {
-    if (standbyMode || !window.speechSynthesis) return;
-    window.speechSynthesis.cancel();
-    const u = new SpeechSynthesisUtterance(text);
-    u.lang = 'zh-TW';
-    window.speechSynthesis.speak(u);
-}
-
-/* ── 眨眼 ── */
-function blinkEffect() {
-    if (standbyMode) return;
-    const eyes = document.querySelectorAll('.eye');
-    const cheeks = document.querySelectorAll('.cheek');
-    eyes.forEach(e => e.style.transform = 'scaleY(0.1)');
-    cheeks.forEach(c => c.style.background = '#ff6b6b');
-    setTimeout(() => {
-        eyes.forEach(e => e.style.transform = 'scaleY(1)');
-        setTimeout(() => { cheeks.forEach(c => c.style.background = '#ffc0cb'); }, 400);
-    }, 200);
-}
-
-/* ── 新增訊息 ── */
-function appendMessage(text, sender, extraHtml = '') {
-    const wrapper = document.createElement('div');
-    wrapper.style.marginBottom = '15px';
-    const div = document.createElement('div');
-    div.className = `msg ${sender}`;
-    div.textContent = text;
-    wrapper.appendChild(div);
-    if (extraHtml) {
-        const hint = document.createElement('div');
-        hint.className = 'search-hint';
-        hint.innerHTML = extraHtml;
-        hint.style.marginLeft = sender === 'user' ? 'auto' : '0';
-        hint.style.maxWidth = '85%';
-        wrapper.appendChild(hint);
     }
-    chatWindowEl.appendChild(wrapper);
-    chatWindowEl.scrollTop = chatWindowEl.scrollHeight;
-    if (sender === 'bot') { speak(text); blinkEffect(); }
-}
 
-/* ── Gemini API ── */
-async function getGeminiResponse(text) {
-    typingEl.style.display = 'block';
-    try {
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL_NAME}:generateContent?key=${MY_GEMINI_KEY}`;
-        const res  = await fetch(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ contents: [{ parts: [{ text: `使用者原始提示詞：${text}` }] }] })
+    // 2. 表情特效
+    function blinkEffect() {
+        const eyes = document.querySelectorAll('.eye');
+        const cheeks = document.querySelectorAll('.cheek');
+        
+        eyes.forEach(e => e.style.transform = "scaleY(0.1)");
+        cheeks.forEach(c => {
+            c.style.background = "#ff6b6b";
+            c.style.opacity = "0.8";
         });
-        const data = await res.json();
-        if (data.error) {
-            return (data.error.message.includes('quota') || data.error.code === 429)
-                ? '哎呀，我現在思緒稍微有點混亂（連線太頻繁了）... ☕️ 請給我約 30 秒的時間休息一下！'
-                : `連線錯誤：${data.error.message}`;
-        }
-        return data.candidates?.[0]?.content?.parts[0]?.text ?? '【資料不足，無法確認】';
-    } catch { return '網路連線似乎有點不穩，請稍後再試。'; }
-    finally  { typingEl.style.display = 'none'; }
-}
 
-/* ── 發送訊息 ── */
-async function sendMessage() {
-    const text = userInputEl.value.trim();
-    if (!text) return;
-    if (faceMaximized) toggleFace();   // 自動還原顯示對話框
-    appendMessage(text, 'user');
-    userInputEl.value = '';
-    if (detectSearch(text)) {
-        const q = extractQuery(text);
-        appendMessage(`好的！我幫你用 Google 搜尋「${q}」，馬上開啟結果 🔍`, 'bot',
-                      `已開啟 Google 搜尋：<strong>${q}</strong>`);
-        speak('這是用 Google 尋找到的結果。');
-        window.open(`https://www.google.com/search?q=${encodeURIComponent(q)}`, '_blank');
-        return;
+        setTimeout(() => {
+            eyes.forEach(e => e.style.transform = "scaleY(1)");
+            setTimeout(() => {
+                cheeks.forEach(c => {
+                    c.style.background = "#ffc0cb";
+                    c.style.opacity = "0.5";
+                });
+            }, 500);
+        }, 200);
     }
-    const reply = await getGeminiResponse(text);
-    appendMessage(reply, 'bot');
-}
 
-/* ── 初始化 ── */
-window.onload = () => {
-    appendMessage('你好！我是 ELISA 😊。現在我已配備專業顧問與事實查核邏輯，想聊聊什麼呢？', 'bot');
-};
+    // 3. 新增訊息到畫面
+    function appendMessage(text, sender) {
+        const div = document.createElement('div');
+        div.className = `msg ${sender}`;
+        div.textContent = text;
+        chatWindow.appendChild(div);
+        chatWindow.scrollTop = chatWindow.scrollHeight;
+        
+        if (sender === 'bot') {
+            speak(text);
+            blinkEffect();
+        }
+    }
+
+    // 4. 串接 Gemini API
+		async function getGeminiResponse(text) {
+			const apiKey = document.getElementById('api-key').value.trim();
+			if (!apiKey) return "請先輸入 API Key 喔！";
+
+			typingIndicator.style.display = "block";
+			
+			// 內建您的專業優化與事實查核提示語
+        const systemInstruction = ``;
+			
+			
+			
+			// 根據您查到的 2026 最新模型名稱
+			const modelName = "gemini-3-flash-preview"; 
+			
+			try {
+				// 使用 v1beta 介面與最新模型名稱
+				const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
+				
+				const response = await fetch(url, {
+					method: "POST",
+					headers: { "Content-Type": "application/json" },
+					body: JSON.stringify({
+						contents: [{
+							parts: [{ 
+								text: `${systemInstruction}\n\n你現在是 ELISA，溫暖的台灣心理輔導員。請用繁體中文回覆，語氣簡短且具同理心。使用者說：${text}` 
+							}]
+						}]
+					})
+				});
+
+				const data = await response.json();
+
+				// 檢查 API 回傳錯誤
+				if (data.error) {
+					console.error("API Error:", data.error);
+					return `連線訊息：${data.error.message}`;
+				}
+
+				// 解析回傳內容
+				if (data.candidates && data.candidates[0].content) {
+					return data.candidates[0].content.parts[0].text;
+				}
+				
+				return "我收到了訊息，但不知道該怎麼回應，能換個方式說說嗎？";
+
+			} catch (error) {
+				console.error("Fetch Error:", error);
+				return "連線發生問題，請檢查網路狀態。";
+			} finally {
+				typingIndicator.style.display = "none";
+			}
+		}
+    // 5. 發送按鈕邏輯
+    async function sendMessage() {
+        const text = userInput.value.trim();
+        if (!text) return;
+
+        appendMessage(text, 'user');
+        userInput.value = "";
+
+        const botReply = await getGeminiResponse(text);
+        appendMessage(botReply, 'bot');
+    }
+
+    // 初始化
+    window.onload = () => {
+        appendMessage("你好！我是 ELISA 😊。今天加入了 Gemini AI 的心靈導航功能。請輸入 API Key 並跟我說說你現在的感覺好嗎？", "bot");
+    };
 </script>
 
 </body>
